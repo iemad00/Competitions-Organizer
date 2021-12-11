@@ -4,6 +4,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Date;
 import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -150,7 +151,6 @@ public class Excel {
     
     public boolean EditComp(int compIndex,String sheetName,String compName,String URL,String date, boolean isTeamBased) throws Exception {
 		int nbOfSheets = wb.getNumberOfSheets();
-
     	if(compIndex > nbOfSheets-1) //if the index out of array
     		return false;
     	
@@ -224,14 +224,17 @@ public class Excel {
     	return true;
     }
     
-    public boolean removeAllCompetitiors(int compIndex) throws Exception {
+    public boolean deleteAllCompetitiors(int compIndex) throws Exception {
+    	sh = wb.getSheetAt(compIndex);
 		int end = sh.getLastRowNum();
-		sh = wb.getSheetAt(compIndex);
     	if(end == 4)
     		return false;
     	
 		for(int i = 5; i <= end;i++) {
-			sh.removeRow(sh.getRow(i));
+			try {
+				sh.removeRow(sh.getRow(i));
+				
+			}catch(Exception e) {}
 		}		
 		
 		outFile = new FileOutputStream("Competitions Participations.xlsx");
@@ -242,10 +245,19 @@ public class Excel {
     }
     
     public boolean addStudent(int compIndex,int stID, String stName,String stMajor) throws Exception {
+		int nbOfSheets = wb.getNumberOfSheets();
+    	if(compIndex > nbOfSheets-1) //if the index out of array
+    		return false;
+    	
     	if(isTeamBased(compIndex))
     		return false;
     	
     	sh = wb.getSheetAt(compIndex);
+		
+		//To determine if there are any same id number before
+		if(idInComp(compIndex,stID))
+			return false;
+		
 		row = sh.createRow(sh.getLastRowNum() + 1);
     	cell = row.createCell(0);
 		cell.setCellValue(sh.getLastRowNum() - 4);
@@ -269,6 +281,10 @@ public class Excel {
     }
     
     private int howManyTeams(int compIndex) {
+		int nbOfSheets = wb.getNumberOfSheets();
+    	if(compIndex > nbOfSheets-1) //if the index out of array
+    		return -1;
+    	
     	if(!isTeamBased(compIndex))
     		return 0;
     	int temp =0;
@@ -285,14 +301,28 @@ public class Excel {
     }
     
     public boolean addTeam(int compIndex,int[] stID,String[] stName,String[] stMajor,String teamName) throws Exception {
+		int nbOfSheets = wb.getNumberOfSheets();
+    	if(compIndex > nbOfSheets-1) //if the index out of array
+    		return false;
+    	
     	if(!isTeamBased(compIndex))
     		return false;
     	if(stID.length != stName.length || stID.length != stMajor.length) //if there are miss information
     		return false;
     	
+		int end = sh.getLastRowNum();
+    	sh = wb.getSheetAt(compIndex);
+    	
+    	//to determine if there same team name before
+		for(int i = 5; i <= end;i++) {
+			if(String.valueOf(sh.getRow(i).getCell(5)).equals(teamName))
+				return false;
+		}
+		
+		
     	int howManyTeams= howManyTeams(compIndex);
     	for(int i = 0;i<stName.length;i++) {
-        	sh = wb.getSheetAt(compIndex);
+        	
     		row = sh.createRow(sh.getLastRowNum() + 1);
         	cell = row.createCell(0);
     		cell.setCellValue(sh.getLastRowNum() - 4);
@@ -319,10 +349,173 @@ public class Excel {
     	return true;
     }
     
+    private boolean idInComp(int compIndex,int stID) {
+    	sh = wb.getSheetAt(compIndex);
+		int end = sh.getLastRowNum();
+		
+		//To determine if there are any same id number before
+		for(int i = 5; i <= end;i++) { 
+			try {
+				if(Integer.parseInt(new DataFormatter().formatCellValue(sh.getRow(i).getCell(1)))  == stID)
+					return true;
+			}catch(Exception e){}
+		}
+		
+    	return false;
+    }
+    
+    public boolean editStudent(int compIndex,int pastStID,int newStID, String stName,String stMajor) throws Exception {
+		int nbOfSheets = wb.getNumberOfSheets();
+    	if(compIndex > nbOfSheets-1) //if the index out of array
+    		return false;
+    	
+    	if(isTeamBased(compIndex))
+    		return false;
+    	
+    	sh = wb.getSheetAt(compIndex);		
+		//To determine if there are any same id number before
+		if(!idInComp(compIndex,pastStID))
+			return false;
+		
+		int end = sh.getLastRowNum();
+
+		
+		int rowNb = -1;
+		for(int i = 5;i <= end;i++) {
+			try {
+				if(Integer.parseInt(new DataFormatter().formatCellValue(sh.getRow(i).getCell(1)))  == pastStID)
+					rowNb = Integer.parseInt(new DataFormatter().formatCellValue(sh.getRow(i).getCell(0))) + 4;
+			}catch(Exception e) {}
+
+		}
+
+
+		
+		if(pastStID!=newStID)
+		for(int i = 5;i<=end;i++) {
+			if(i != rowNb)
+				try {
+					if(Integer.parseInt(new DataFormatter().formatCellValue(sh.getRow(i).getCell(1)))  == newStID)
+						return false;
+				}catch(Exception e) {}
+		}
+		
+		row = sh.getRow(rowNb);
+    	cell = row.createCell(0);
+		cell.setCellValue(rowNb-4);
+		
+    	cell = row.createCell(1);
+		cell.setCellValue(newStID);
+
+    	cell = row.createCell(2);
+		cell.setCellValue(stName);
+		
+    	cell = row.createCell(3);
+		cell.setCellValue(stMajor);
+		
+			
+
+		
+		outFile = new FileOutputStream("Competitions Participations.xlsx");
+		wb.write(outFile);
+		outFile.flush();
+		outFile.close();
+    	return true;
+    }
+    
+    public boolean editStudentInTeam(int compIndex,int pastStID,int newStID, String stName,String stMajor) throws Exception {
+		int nbOfSheets = wb.getNumberOfSheets();
+    	if(compIndex > nbOfSheets-1) //if the index out of array
+    		return false;
+    	
+    	if(!isTeamBased(compIndex))
+    		return false;
+    	
+    	sh = wb.getSheetAt(compIndex);		
+		//To determine if there are any same id number before
+		if(!idInComp(compIndex,pastStID))
+			return false;
+		
+		int end = sh.getLastRowNum();
+
+		
+		int rowNb = -1;
+		for(int i = 5;i <= end;i++) {
+			try {
+				if(Integer.parseInt(new DataFormatter().formatCellValue(sh.getRow(i).getCell(1)))  == pastStID)
+					rowNb = Integer.parseInt(new DataFormatter().formatCellValue(sh.getRow(i).getCell(0))) + 4;
+			}catch(Exception e) {}
+
+		}
+
+		if(pastStID!=newStID)
+		for(int i = 5;i<=end;i++) {
+			if(i != rowNb)
+				try {
+					if(Integer.parseInt(new DataFormatter().formatCellValue(sh.getRow(i).getCell(1)))  == newStID)
+						return false;
+				}catch(Exception e) {}
+		}
+		
+		row = sh.getRow(rowNb);
+    	cell = row.createCell(0);
+		cell.setCellValue(rowNb-4);
+		
+    	cell = row.createCell(1);
+		cell.setCellValue(newStID);
+
+    	cell = row.createCell(2);
+		cell.setCellValue(stName);
+		
+    	cell = row.createCell(3);
+		cell.setCellValue(stMajor);
+		
+		
+
+
+		
+		outFile = new FileOutputStream("Competitions Participations.xlsx");
+		wb.write(outFile);
+		outFile.flush();
+		outFile.close();
+    	return true;
+    }
+    
+    public boolean editTeamName(int compIndex,String oldName,String newName) throws Exception {
+		int nbOfSheets = wb.getNumberOfSheets();
+    	if(compIndex > nbOfSheets-1) //if the index out of array
+    		return false;
+    	
+    	if(!isTeamBased(compIndex))
+    		return false;
+    	
+    	sh = wb.getSheetAt(compIndex);		
+		int end = sh.getLastRowNum();
+		
+		if(!teamInComp(compIndex,oldName)) //if the team name not there
+			return false;
+	
+		if(teamInComp(compIndex,newName)) //if the team name complicated
+			return false;
+		
+		for(int i = 5; i <= end; i++) {
+			if(String.valueOf(sh.getRow(i).getCell(5)).equals(oldName)) {
+				sh.getRow(i).createCell(5).setCellValue(newName);
+			}
+		}
+		
+		outFile = new FileOutputStream("Competitions Participations.xlsx");
+		wb.write(outFile);
+		outFile.flush();
+		outFile.close();
+    	return true;  	
+    }
+    
     public boolean deleteComp(int compIndex) throws Exception {
 		int nbOfSheets = wb.getNumberOfSheets();
-    	if(compIndex >= nbOfSheets) //if there is same sheet name
+    	if(compIndex > nbOfSheets-1) //if the index out of array
     		return false;
+    	
     	wb.removeSheetAt(compIndex);		
 		outFile = new FileOutputStream("Competitions Participations.xlsx");
 		wb.write(outFile);
@@ -331,29 +524,72 @@ public class Excel {
     	return true;
     }
     
-    
-    //=========================================================
-    //=========================================================
-    //=========================================================
-    //=========================================================
-    //=========================================================
+    public boolean rankStudent(int compIndex,int stID,int rank) throws IOException {
+		int nbOfSheets = wb.getNumberOfSheets();
+    	if(compIndex > nbOfSheets-1) //if the index out of array
+    		return false;
+    	
+    	if(isTeamBased(compIndex))
+    		return false;
+    	
+    	sh = wb.getSheetAt(compIndex);		
+		//if the id wrong
+		if(!idInComp(compIndex,stID))
+			return false;
+    	
+		int end = sh.getLastRowNum();		
+		int rowNb = -1;
+		for(int i = 5;i <= end;i++) {
+			try {
+				if(Integer.parseInt(new DataFormatter().formatCellValue(sh.getRow(i).getCell(1)))  == stID)
+					rowNb = Integer.parseInt(new DataFormatter().formatCellValue(sh.getRow(i).getCell(0))) + 4;
+			}catch(Exception e) {}
 
-    //Ignore it, just for testing
-	public static void main(String[] args) throws Exception {				
-		Excel e = new Excel();		
+		}
 		
-	//	System.out.println(e.createComp("test1", "Emad Test", "www.google.com", "13/OCT/2021",true));
-	//	System.out.println(e.createComp("test2", "Emad Test", "www.google.com", "13/OCT/2021",false));
-	//	System.out.println(e.EditComp(1,"CyberHub", "emad albalawi", "www.google.com", "13/OCT/2021", false));
-		//System.out.println(e.removeAllCompetitiors(1));
+		row = sh.getRow(rowNb);
+    	cell = row.createCell(4);
+		cell.setCellValue(rank);
 		
-		String[] names = {"Emad Albalawi", "Khaled Alnobi","Saleh altalhi"};
-		int[] id = {201960090,201943090,201844290};
-		String[] majors = {"SWE", "CS","CE"};
-	//	System.out.println(e.addTeam(0, id, names, majors, "Hunters"));
-		System.out.println(e.addStudent(1, 201960090, "emad albalawi", "Hunters"));
-	}
-	
+		outFile = new FileOutputStream("Competitions Participations.xlsx");
+		wb.write(outFile);
+		outFile.flush();
+		outFile.close();
+    	return true;
+    }
     
+    private boolean teamInComp(int compIndex,String teamName) {
+    	sh = wb.getSheetAt(compIndex);		
+		int end = sh.getLastRowNum();
+		for(int i = 5; i <= end;i++) {
+			if(String.valueOf(sh.getRow(i).getCell(5)).equals(teamName))
+				return true;
+		}
+		return false;
+    }
     
+    public boolean rankTeam(int compIndex,String teamName,int rank) throws IOException {
+		int nbOfSheets = wb.getNumberOfSheets();
+    	if(compIndex > nbOfSheets-1) //if the index out of array
+    		return false;
+    	
+    	if(! isTeamBased(compIndex))
+    		return false;
+    	
+    	sh = wb.getSheetAt(compIndex);		
+		int end = sh.getLastRowNum();
+
+
+		
+		if(!teamInComp(compIndex,teamName)) //if the team name not there
+			return false;
+		
+		
+		outFile = new FileOutputStream("Competitions Participations.xlsx");
+		wb.write(outFile);
+		outFile.flush();
+		outFile.close();
+    	return true;
+    }
+
 }
